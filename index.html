@@ -214,8 +214,8 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px 
 
 <div class="fallback" id="fallback" hidden>
   <div>
-    <strong>This scene needs WebGPU.</strong>
-    <p id="fallback-msg">Your browser did not provide a WebGPU device. Open the page in a recent Chrome, Edge or Safari with WebGPU turned on.</p>
+    <strong>This scene needs WebGPU or WebGL2.</strong>
+    <p id="fallback-msg">Your browser provided neither a WebGPU device nor WebGL2 with float render targets. Open the page in a recent Chrome, Edge, Safari or Firefox.</p>
   </div>
 </div>
 
@@ -737,113 +737,113 @@ struct U {
 @group(0) @binding(4) var sRep: sampler;
 @group(0) @binding(5) var sClamp: sampler;
 
-const KEY = vec3f(1.0, 0.95, 0.88);
-const AMB = vec3f(0.60, 0.63, 0.70);
+const KEY: vec3f = vec3f(1.0, 0.95, 0.88);
+const AMB: vec3f = vec3f(0.60, 0.63, 0.70);
 
 fn tonemap(c: vec3f) -> vec3f {
-  let x = c * 0.78 * u.ex.w;
-  let t = clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), vec3f(0.0), vec3f(1.0));
+  let x: vec3f = c * 0.78 * u.ex.w;
+  let t: vec3f = clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), vec3f(0.0), vec3f(1.0));
   return pow(t, vec3f(1.0 / 2.2));
 }
-fn hash12(p: vec2f) -> f32 { var q = fract(vec3f(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+fn hash12(p: vec2f) -> f32 { var q: vec3f = fract(vec3f(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
 fn N4(p: vec3f) -> vec4f { return textureSampleLevel(noiseTex, sRep, p, 0.0); }
 
 struct VQ { @builtin(position) p: vec4f };
 @vertex fn vsFull(@builtin(vertex_index) i: u32) -> VQ {
-  let xy = vec2f(f32((i << 1u) & 2u), f32(i & 2u)) * 2.0 - 1.0;
+  let xy: vec2f = vec2f(f32((i << 1u) & 2u), f32(i & 2u)) * 2.0 - 1.0;
   return VQ(vec4f(xy, 0.0, 1.0));
 }
 
 // ---- shadows from a top-down map of the slice's highest (r) and lowest (-g) points
 fn hmap(xz: vec2f) -> vec2f {
-  let q = (xz - u.shadow.xy) / u.shadow.z;
+  let q: vec2f = (xz - u.shadow.xy) / u.shadow.z;
   if (abs(q.x) > 0.998 || abs(q.y) > 0.998) { return vec2f(-1e3, 1e3); }
-  let tc = vec2i(i32((q.x * 0.5 + 0.5) * 512.0), i32((0.5 - q.y * 0.5) * 512.0));
-  let d = textureLoad(shadowTex, tc, 0).rg;
+  let tc: vec2i = vec2i(i32((q.x * 0.5 + 0.5) * 512.0), i32((0.5 - q.y * 0.5) * 512.0));
+  let d: vec2f = textureLoad(shadowTex, tc, 0).rg;
   return vec2f(d.r, -d.g);
 }
 fn vogel(i: i32, n: i32, rot: f32) -> vec2f {
-  let r = sqrt((f32(i) + 0.5) / f32(n));
-  let a = f32(i) * 2.39996 + rot;
+  let r: f32 = sqrt((f32(i) + 0.5) / f32(n));
+  let a: f32 = f32(i) * 2.39996 + rot;
   return r * vec2f(cos(a), sin(a));
 }
 // light reaching a point of the table or plate, with the slice's soft shadow and contact occlusion
 fn groundLight(p: vec3f, fc: vec2f) -> vec3f {
-  let l = normalize(u.light.xyz);
-  let rot = hash12(fc) * 6.2832;
+  let l: vec3f = normalize(u.light.xyz);
+  let rot: f32 = hash12(fc) * 6.2832;
   // soft key shadow: a few rays marched toward the light through the height span
-  var key = 0.0;
-  let jit = hash12(fc + 17.0);
-  for (var r = 0; r < 6; r++) {
-    let o = vogel(r, 6, rot);
-    for (var s = 0; s < 12; s++) {
-      let t = (f32(s) + jit) * 0.075;
-      let q = p + l * t;
-      let hb = hmap(q.xz + o * (0.015 + 0.16 * t));
+  var key: f32 = 0.0;
+  let jit: f32 = hash12(fc + 17.0);
+  for (var r: i32 = 0; r < 6; r++) {
+    let o: vec2f = vogel(r, 6, rot);
+    for (var s: i32 = 0; s < 12; s++) {
+      let t: f32 = (f32(s) + jit) * 0.075;
+      let q: vec3f = p + l * t;
+      let hb: vec2f = hmap(q.xz + o * (0.015 + 0.16 * t));
       if (q.y <= hb.x && q.y >= hb.y - 0.02) { key += 1.0; break; }
     }
   }
   key /= 6.0;
-  var ao = 0.0;
-  for (var i = 0; i < 10; i++) {
-    let h = hmap(p.xz + vogel(i, 10, rot) * 0.3).y - p.y;
+  var ao: f32 = 0.0;
+  for (var i: i32 = 0; i < 10; i++) {
+    let h: f32 = hmap(p.xz + vogel(i, 10, rot) * 0.3).y - p.y;
     ao += 1.0 - smoothstep(0.0, 0.7, h);
   }
   ao /= 10.0;
   // Light that passes through the flesh tints the shadow warm.
-  let through = pow(vec3f(0.42, 0.20, 0.15), vec3f(u.misc.z));
-  let direct = KEY * 1.5 * l.y * mix(vec3f(1.0), through, key);
-  let amb = AMB * 0.55 * (1.0 - 0.75 * ao) * mix(vec3f(1.0), vec3f(1.0, 0.8, 0.72), ao);
-  let pool = exp(-dot(p.xz - vec2f(-0.3, 0.4), p.xz - vec2f(-0.3, 0.4)) * 0.035);
+  let through: vec3f = pow(vec3f(0.42, 0.20, 0.15), vec3f(u.misc.z));
+  let direct: vec3f = KEY * 1.5 * l.y * mix(vec3f(1.0), through, key);
+  let amb: vec3f = AMB * 0.55 * (1.0 - 0.75 * ao) * mix(vec3f(1.0), vec3f(1.0, 0.8, 0.72), ao);
+  let pool: f32 = exp(-dot(p.xz - vec2f(-0.3, 0.4), p.xz - vec2f(-0.3, 0.4)) * 0.035);
   return (direct + amb) * (0.8 + 0.3 * pool);
 }
 fn backdrop(rd: vec3f) -> vec3f {
   return u.scene.xyz * (KEY * 1.5 * 0.77 + AMB * 0.55) * 0.8;
 }
 // A glazed rectangular plate (top at y = 0, standing PLATE_H on the table) with a raised rim and fine ribs.
-const PLATE = vec2f(4.0, 3.0);
-const PLATE_R = 0.8;
-const PLATE_H = 0.2;
+const PLATE: vec2f = vec2f(4.0, 3.0);
+const PLATE_R: f32 = 0.8;
+const PLATE_H: f32 = 0.2;
 fn plateSd(xz: vec2f) -> f32 {
-  let q = abs(xz) - PLATE + PLATE_R;
+  let q: vec2f = abs(xz) - PLATE + PLATE_R;
   return length(max(q, vec2f(0.0))) + min(max(q.x, q.y), 0.0) - PLATE_R;
 }
 fn plateTop(p: vec3f, rd: vec3f, fc: vec2f) -> vec3f {
-  let sd = plateSd(p.xz);
-  let e = 0.02;
-  let g = vec2f(plateSd(p.xz + vec2f(e, 0.0)) - sd, plateSd(p.xz + vec2f(0.0, e)) - sd) / e;
-  let rim = smoothstep(-0.9, -0.05, sd);                      // the rim curls up toward the edge
-  let ribs = cos(p.z * 80.0) * 0.05 * rim;                    // fine ribs pressed into the glazed rim
-  let n = normalize(vec3f(-g.x * rim * 0.5, 1.0, -g.y * rim * 0.5 + ribs));
-  let V = -rd;
-  let F = 0.04 + 0.96 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
-  let lt = groundLight(p, fc);
-  let occl = clamp(dot(lt, vec3f(0.3)) / dot(KEY * 1.5 * normalize(u.light.xyz).y + AMB * 0.55, vec3f(0.3)), 0.0, 1.0);
-  let l = normalize(u.light.xyz); let h = normalize(l + V);
-  let spec = ggxA(h, n, vec3f(1.0, 0.0, 0.0), vec3f(0.0, 0.0, 1.0), 0.12, 0.3) * F * max(dot(n, l), 0.0) * occl;
+  let sd: f32 = plateSd(p.xz);
+  let e: f32 = 0.02;
+  let g: vec2f = vec2f(plateSd(p.xz + vec2f(e, 0.0)) - sd, plateSd(p.xz + vec2f(0.0, e)) - sd) / e;
+  let rim: f32 = smoothstep(-0.9, -0.05, sd);                      // the rim curls up toward the edge
+  let ribs: f32 = cos(p.z * 80.0) * 0.05 * rim;                    // fine ribs pressed into the glazed rim
+  let n: vec3f = normalize(vec3f(-g.x * rim * 0.5, 1.0, -g.y * rim * 0.5 + ribs));
+  let V: vec3f = -rd;
+  let F: f32 = 0.04 + 0.96 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
+  let lt: vec3f = groundLight(p, fc);
+  let occl: f32 = clamp(dot(lt, vec3f(0.3)) / dot(KEY * 1.5 * normalize(u.light.xyz).y + AMB * 0.55, vec3f(0.3)), 0.0, 1.0);
+  let l: vec3f = normalize(u.light.xyz); let h: vec3f = normalize(l + V);
+  let spec: f32 = ggxA(h, n, vec3f(1.0, 0.0, 0.0), vec3f(0.0, 0.0, 1.0), 0.12, 0.3) * F * max(dot(n, l), 0.0) * occl;
   return u.plate.xyz * lt + envColor(reflect(rd, n)) * F * (0.06 + 0.16 * occl) + KEY * spec * 0.5;
 }
 @fragment fn fsGround(@builtin(position) fc: vec4f) -> @location(0) vec4f {
-  let uv = fc.xy * u.res.zw;
-  let ndc = vec2f(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
-  let a = u.ivp * vec4f(ndc, 0.0, 1.0);
-  let b = u.ivp * vec4f(ndc, 1.0, 1.0);
-  let ro = a.xyz / a.w;
-  let rd = normalize(b.xyz / b.w - ro);
-  var col = backdrop(rd);
+  let uv: vec2f = fc.xy * u.res.zw;
+  let ndc: vec2f = vec2f(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+  let a: vec4f = u.ivp * vec4f(ndc, 0.0, 1.0);
+  let b: vec4f = u.ivp * vec4f(ndc, 1.0, 1.0);
+  let ro: vec3f = a.xyz / a.w;
+  let rd: vec3f = normalize(b.xyz / b.w - ro);
+  var col: vec3f = backdrop(rd);
   if (rd.y < 0.0) {
-    let on = u.scene.w > 0.5;
-    let p = ro + rd * (-ro.y / rd.y);
+    let on: bool = u.scene.w > 0.5;
+    let p: vec3f = ro + rd * (-ro.y / rd.y);
     if (on && plateSd(p.xz) < 0.0) {
       col = plateTop(p, rd, fc.xy);
     } else {
-      let t = (-select(0.0, PLATE_H, on) - ro.y) / rd.y;
-      let q = ro + rd * t;
-      let sd = plateSd(q.xz);
+      let t: f32 = (-select(0.0, PLATE_H, on) - ro.y) / rd.y;
+      let q: vec3f = ro + rd * t;
+      let sd: f32 = plateSd(q.xz);
       if (on && sd < 0.0) {
         col = u.plate.xyz * AMB * 0.35;                       // the plate's front wall
       } else {
-        let edge = select(1.0, 0.55 + 0.45 * smoothstep(0.0, 0.5, sd), on);   // contact shade around the plate
+        let edge: f32 = select(1.0, 0.55 + 0.45 * smoothstep(0.0, 0.5, sd), on);   // contact shade around the plate
         col = mix(u.scene.xyz * groundLight(q, fc.xy) * edge, col, smoothstep(9.0, 22.0, t));
       }
     }
@@ -851,7 +851,7 @@ fn plateTop(p: vec3f, rd: vec3f, fc: vec2f) -> vec3f {
   return vec4f(col, 1.0);
 }
 @fragment fn fsBlit(@builtin(position) fc: vec4f) -> @location(0) vec4f {
-  let c = textureSampleLevel(bgTex, sClamp, fc.xy * u.res.zw, 0.0).rgb;
+  let c: vec3f = textureSampleLevel(bgTex, sClamp, fc.xy * u.res.zw, 0.0).rgb;
   return vec4f(tonemap(c) + (hash12(fc.xy) - 0.5) / 255.0, 1.0);
 }
 
@@ -873,12 +873,12 @@ struct VOut {
 }
 struct SO { @builtin(position) p: vec4f, @location(0) y: f32 };
 @vertex fn vsShadow(@location(0) pos: vec3f) -> SO {
-  let s = u.shadow;
+  let s: vec4f = u.shadow;
   return SO(vec4f((pos.x - s.x) / s.z, (pos.z - s.y) / s.z, 0.5, 1.0), pos.y);
 }
 @fragment fn fsShadow(i: SO) -> @location(0) vec4f { return vec4f(i.y, -i.y, 0.0, 0.0); }
 fn inv3(m: mat3x3f) -> mat3x3f {
-  let r0 = cross(m[1], m[2]); let r1 = cross(m[2], m[0]); let r2 = cross(m[0], m[1]);
+  let r0: vec3f = cross(m[1], m[2]); let r1: vec3f = cross(m[2], m[0]); let r2: vec3f = cross(m[0], m[1]);
   return transpose(mat3x3f(r0, r1, r2)) * (1.0 / dot(m[0], r0));
 }
 struct Med { sA: vec3f, sS: vec3f };
@@ -888,54 +888,54 @@ struct Med { sA: vec3f, sS: vec3f };
 // around an apex and wander with low-frequency noise (irregularity); the seed shifts the noise for a new pattern.
 struct Pat { ph: f32, n1: vec4f, n2: vec4f };
 fn pattern(m: vec3f) -> Pat {
-  let v = 1.0 - m.z / u.dims.z;
-  let sd = u.pat.xy;
-  let n1 = N4(m * vec3f(0.20, 0.32, 0.30) + vec3f(0.13 + sd.x, 0.71, 0.31 + sd.y));
-  let n2 = N4(m * vec3f(0.85, 1.3, 1.0) + vec3f(0.52 + sd.y, 0.23, 0.91 + sd.x));
-  let a = v - u.pat2.x;
-  let bend = u.pat.z * mix(sqrt(a * a + 0.004), 1.8 * a * a, u.pat2.y) - 0.10 * v;
-  let st = u.plate.w;
-  let yc = 2.0 * m.y / u.dims.y - 1.0;   // natural: the sheets cup through the thickness, so cut sides show nested arcs
-  let ph = (m.x + bend + mix(0.55, 0.2, st) * m.y + 0.07 * st * yc * yc + ((n1.x - 0.5) * 0.6 + (n2.x - 0.5) * 0.06) * u.pat.w) / (0.33 * u.misc.x);
+  let v: f32 = 1.0 - m.z / u.dims.z;
+  let sd: vec2f = u.pat.xy;
+  let n1: vec4f = N4(m * vec3f(0.20, 0.32, 0.30) + vec3f(0.13 + sd.x, 0.71, 0.31 + sd.y));
+  let n2: vec4f = N4(m * vec3f(0.85, 1.3, 1.0) + vec3f(0.52 + sd.y, 0.23, 0.91 + sd.x));
+  let a: f32 = v - u.pat2.x;
+  let bend: f32 = u.pat.z * mix(sqrt(a * a + 0.004), 1.8 * a * a, u.pat2.y) - 0.10 * v;
+  let st: f32 = u.plate.w;
+  let yc: f32 = 2.0 * m.y / u.dims.y - 1.0;   // natural: the sheets cup through the thickness, so cut sides show nested arcs
+  let ph: f32 = (m.x + bend + mix(0.55, 0.2, st) * m.y + 0.07 * st * yc * yc + ((n1.x - 0.5) * 0.6 + (n2.x - 0.5) * 0.06) * u.pat.w) / (0.33 * u.misc.x);
   return Pat(ph, n1, n2);
 }
-fn groove(m: vec3f) -> f32 { let f = fract(pattern(m).ph); return smoothstep(0.0, 0.24, min(f, 1.0 - f)); }
+fn groove(m: vec3f) -> f32 { let f: f32 = fract(pattern(m).ph); return smoothstep(0.0, 0.24, min(f, 1.0 - f)); }
 // Optical properties in material space: myosepta (white fat sheets), marbling, the belly fat edge,
 // muscle fibres, the dark chiai band and the silver skin layer along the skin side.
 fn medium(m: vec3f) -> Med {
-  let W = u.dims.z;
-  let v = 1.0 - m.z / W;   // 0 = belly edge (camera side), 1 = skin edge
-  let P = pattern(m);
-  let n1 = P.n1; let n2 = P.n2;
-  let sp = 0.33 * u.misc.x;
-  let f1 = fract(P.ph);
-  let d = min(f1, 1.0 - f1) * sp;
-  let st = u.plate.w;
-  let wd = u.sigS.w * mix(0.3 + 1.4 * n1.y, 1.2 + 0.6 * n1.y, st);
-  var fat = max(smoothstep(wd, wd * mix(0.15, 0.6, st), d), smoothstep(wd * mix(2.6, 1.6, st), wd, d) * mix(0.28, 0.18, st));   // pale border (natural: crisp edge)
-  let f2 = fract(P.ph + 0.5 + (n1.z - 0.5) * 0.5);
-  let d2 = min(f2, 1.0 - f2) * sp;
+  let W: f32 = u.dims.z;
+  let v: f32 = 1.0 - m.z / W;   // 0 = belly edge (camera side), 1 = skin edge
+  let P: Pat = pattern(m);
+  let n1: vec4f = P.n1; let n2: vec4f = P.n2;
+  let sp: f32 = 0.33 * u.misc.x;
+  let f1: f32 = fract(P.ph);
+  let d: f32 = min(f1, 1.0 - f1) * sp;
+  let st: f32 = u.plate.w;
+  let wd: f32 = u.sigS.w * mix(0.3 + 1.4 * n1.y, 1.2 + 0.6 * n1.y, st);
+  var fat: f32 = max(smoothstep(wd, wd * mix(0.15, 0.6, st), d), smoothstep(wd * mix(2.6, 1.6, st), wd, d) * mix(0.28, 0.18, st));   // pale border (natural: crisp edge)
+  let f2: f32 = fract(P.ph + 0.5 + (n1.z - 0.5) * 0.5);
+  let d2: f32 = min(f2, 1.0 - f2) * sp;
   fat = max(fat, smoothstep(wd * 0.5, 0.0, d2) * smoothstep(0.62, 0.8, n2.y) * u.pat2.z);
   // many thin fat lines across the main sheets (along the muscle fibres, material x), wavy
   // each line (per gap between main sheets) gets its own random offset, presence, strength, width and reach
-  let q3 = m.z / W * u.ex2.z + (n1.x - 0.5) * 1.2 + (n2.y - 0.5) * 0.5;
-  let k3 = vec2f(floor(q3), floor(P.ph + 0.5));
-  let h3 = vec4f(hash12(k3), hash12(k3 + 17.3), hash12(k3 + 41.7), hash12(k3 + 73.1));
-  let cw = W / max(u.ex2.z, 1.0);   // line cell width; a line wider than its cell is cut into blocks
-  let d3 = abs(fract(q3) - 0.5 - (h3.x - 0.5) * mix(0.6, 0.4, st)) * cw;
-  let w3 = min(wd * (0.4 + 0.9 * h3.w), mix(1e3, cw * 0.28, st));
-  let near = exp(-max(d - wd, 0.0) / (0.045 * (0.5 + 1.2 * h3.z) * (0.6 + n2.x)));   // unbroken, fading with distance from the main sheet
+  let q3: f32 = m.z / W * u.ex2.z + (n1.x - 0.5) * 1.2 + (n2.y - 0.5) * 0.5;
+  let k3: vec2f = vec2f(floor(q3), floor(P.ph + 0.5));
+  let h3: vec4f = vec4f(hash12(k3), hash12(k3 + 17.3), hash12(k3 + 41.7), hash12(k3 + 73.1));
+  let cw: f32 = W / max(u.ex2.z, 1.0);   // line cell width; a line wider than its cell is cut into blocks
+  let d3: f32 = abs(fract(q3) - 0.5 - (h3.x - 0.5) * mix(0.6, 0.4, st)) * cw;
+  let w3: f32 = min(wd * (0.4 + 0.9 * h3.w), mix(1e3, cw * 0.28, st));
+  let near: f32 = exp(-max(d - wd, 0.0) / (0.045 * (0.5 + 1.2 * h3.z) * (0.6 + n2.x)));   // unbroken, fading with distance from the main sheet
   fat = max(fat, smoothstep(w3, w3 * 0.13, d3) * near * smoothstep(0.2, 0.45, h3.y) * (0.45 + 0.55 * h3.z) * u.ex2.w);
   fat = max(fat, smoothstep(0.70, 0.86, n2.z) * u.sigA.w);
   fat = max(fat, smoothstep(0.09, 0.0, v + (n2.w - 0.5) * 0.06) * 0.65);
-  let fb = N4(m * vec3f(0.25, 2.4, 2.0) + vec3f(u.pat.xy, 0.5)).y;
-  let shade = (mix(0.82, 0.93, st) + mix(0.36, 0.14, st) * n1.w + 0.18 * smoothstep(sp * 0.45, 0.0, d)) * (1.0 + u.pat2.w * (fb - 0.5));
-  var sA = u.sigA.xyz / shade;
-  var sS = u.sigS.xyz * shade;
-  let chiai = smoothstep(0.83, 0.94, v) * (1.0 - smoothstep(0.972, 0.99, v));
+  let fb: f32 = N4(m * vec3f(0.25, 2.4, 2.0) + vec3f(u.pat.xy, 0.5)).y;
+  let shade: f32 = (mix(0.82, 0.93, st) + mix(0.36, 0.14, st) * n1.w + 0.18 * smoothstep(sp * 0.45, 0.0, d)) * (1.0 + u.pat2.w * (fb - 0.5));
+  var sA: vec3f = u.sigA.xyz / shade;
+  var sS: vec3f = u.sigS.xyz * shade;
+  let chiai: f32 = smoothstep(0.83, 0.94, v) * (1.0 - smoothstep(0.972, 0.99, v));
   sA = mix(sA, vec3f(1.6, 7.0, 7.5), chiai * u.fatC.w);
   sS = mix(sS, vec3f(2.2, 1.1, 1.0), chiai * u.fatC.w);
-  let skin = smoothstep(mix(0.95, 0.93, st), mix(0.995, 0.985, st), v);
+  let skin: f32 = smoothstep(mix(0.95, 0.93, st), mix(0.995, 0.985, st), v);
   sA = mix(sA, mix(vec3f(1.8, 1.9, 1.7), vec3f(1.2, 1.25, 1.2), st), skin);   // natural: greyish white fat layer
   sS = mix(sS, vec3f(10.0, 10.0, 10.5), skin);
   sA = mix(sA, vec3f(0.06, 0.16, 0.32), fat);
@@ -944,103 +944,103 @@ fn medium(m: vec3f) -> Med {
 }
 // anisotropic GGX: ay > ax stretches the highlight across the fibres, like a sheen on brushed grain
 fn ggxA(h: vec3f, n: vec3f, t: vec3f, b: vec3f, ax: f32, ay: f32) -> f32 {
-  let x = dot(h, t) / ax; let y = dot(h, b) / ay; let z = dot(h, n);
-  let d = x * x + y * y + z * z;
+  let x: f32 = dot(h, t) / ax; let y: f32 = dot(h, b) / ay; let z: f32 = dot(h, n);
+  let d: f32 = x * x + y * y + z * z;
   return 1.0 / (3.14159 * ax * ay * d * d);
 }
 fn envColor(r: vec3f) -> vec3f {
-  let l = normalize(u.light.xyz);
-  let box = smoothstep(0.55, 0.97, dot(r, l));
-  let sky = smoothstep(-0.05, 0.6, r.y);
-  let wall = u.scene.xyz * (KEY * 1.5 * 0.77 + AMB * 0.55) * 0.8;
+  let l: vec3f = normalize(u.light.xyz);
+  let box: f32 = smoothstep(0.55, 0.97, dot(r, l));
+  let sky: f32 = smoothstep(-0.05, 0.6, r.y);
+  let wall: vec3f = u.scene.xyz * (KEY * 1.5 * 0.77 + AMB * 0.55) * 0.8;
   return mix(wall * 0.9, wall * 1.25, sky) + KEY * box * box * 1.8;
 }
 const STEPS: i32 = 16;
 // distance from material point m to the slice's surface along material direction d
 fn exitDist(m: vec3f, d: vec3f) -> f32 {
-  let sf = select(vec3f(-1e-5), vec3f(1e-5), d >= vec3f(0.0)) + d;
-  let tb = (select(vec3f(0.0), u.dims.xyz, d > vec3f(0.0)) - m) / sf;
+  let sf: vec3f = select(vec3f(-1e-5), vec3f(1e-5), d >= vec3f(0.0)) + d;
+  let tb: vec3f = (select(vec3f(0.0), u.dims.xyz, d > vec3f(0.0)) - m) / sf;
   return max(min(min(tb.x, tb.y), tb.z), 0.0);
 }
 @fragment fn fsSlice(i: VOut) -> @location(0) vec4f {
-  let J = mat3x3f(i.j0, i.j1, i.j2);
-  let Ji = inv3(J);
-  let V = normalize(u.cam.xyz - i.wp);
-  var n = normalize(i.n);
+  let J: mat3x3f = mat3x3f(i.j0, i.j1, i.j2);
+  let Ji: mat3x3f = inv3(J);
+  let V: vec3f = normalize(u.cam.xyz - i.wp);
+  var n: vec3f = normalize(i.n);
   // moist micro-relief and muscle fibre streaks, defined in material space so they ride with the flesh
-  let bq = i.m * vec3f(0.8, 1.1, 1.1) + vec3f(0.3, 0.1, 0.7);
-  let e = 0.006;
-  let b0 = N4(bq).w;
-  let gm = vec3f(N4(bq + vec3f(e, 0.0, 0.0)).w - b0, N4(bq + vec3f(0.0, e, 0.0)).w - b0, N4(bq + vec3f(0.0, 0.0, e)).w - b0) / e * vec3f(0.8, 1.1, 1.1);
-  let gw = transpose(Ji) * gm;
+  let bq: vec3f = i.m * vec3f(0.8, 1.1, 1.1) + vec3f(0.3, 0.1, 0.7);
+  let e: f32 = 0.006;
+  let b0: f32 = N4(bq).w;
+  let gm: vec3f = vec3f(N4(bq + vec3f(e, 0.0, 0.0)).w - b0, N4(bq + vec3f(0.0, e, 0.0)).w - b0, N4(bq + vec3f(0.0, 0.0, e)).w - b0) / e * vec3f(0.8, 1.1, 1.1);
+  let gw: vec3f = transpose(Ji) * gm;
   // myomeres bulge slightly between the fat lines, so each line sits in a shallow groove
-  let ge = 0.012;
-  let g0 = groove(i.m);
-  let gg = transpose(Ji) * (vec3f(groove(i.m + vec3f(ge, 0.0, 0.0)), groove(i.m + vec3f(0.0, ge, 0.0)), groove(i.m + vec3f(0.0, 0.0, ge))) - g0) / ge;
+  let ge: f32 = 0.012;
+  let g0: f32 = groove(i.m);
+  let gg: vec3f = transpose(Ji) * (vec3f(groove(i.m + vec3f(ge, 0.0, 0.0)), groove(i.m + vec3f(0.0, ge, 0.0)), groove(i.m + vec3f(0.0, 0.0, ge))) - g0) / ge;
   // fine grain: fibre bundles (~0.3-1 mm) streaking along material x; faded out where a pixel covers several
-  let gs = vec3f(0.8, 5.0, 4.0) / u.wasabi.w;
-  let gq = i.m * gs + vec3f(u.pat.xy, 0.37);
-  let ee = 0.01;
-  let q0 = N4(gq).z;
+  let gs: vec3f = vec3f(0.8, 5.0, 4.0) / u.wasabi.w;
+  let gq: vec3f = i.m * gs + vec3f(u.pat.xy, 0.37);
+  let ee: f32 = 0.01;
+  let q0: f32 = N4(gq).z;
   // only on the cut faces (material y); on the sides the streaks ran across the view and read as blotchy shadows
-  let topF = smoothstep(0.6, 0.85, abs(normalize(transpose(J) * n).y));
-  let gf = (1.0 - smoothstep(0.006 * u.wasabi.w, 0.03 * u.wasabi.w, length(fwidth(i.m)))) * u.ex2.x * topF;
-  let gr = transpose(Ji) * ((vec3f(N4(gq + vec3f(ee, 0.0, 0.0)).z, N4(gq + vec3f(0.0, ee, 0.0)).z, N4(gq + vec3f(0.0, 0.0, ee)).z) - q0) / ee * gs);
-  let ns = normalize(n - u.ex.z * (gw - n * dot(gw, n)) - u.misc.w * (gg - n * dot(gg, n)));
+  let topF: f32 = smoothstep(0.6, 0.85, abs(normalize(transpose(J) * n).y));
+  let gf: f32 = (1.0 - smoothstep(0.006 * u.wasabi.w, 0.03 * u.wasabi.w, length(fwidth(i.m)))) * u.ex2.x * topF;
+  let gr: vec3f = transpose(Ji) * ((vec3f(N4(gq + vec3f(ee, 0.0, 0.0)).z, N4(gq + vec3f(0.0, ee, 0.0)).z, N4(gq + vec3f(0.0, 0.0, ee)).z) - q0) / ee * gs);
+  let ns: vec3f = normalize(n - u.ex.z * (gw - n * dot(gw, n)) - u.misc.w * (gg - n * dot(gg, n)));
   n = normalize(ns - gf * (gr - ns * dot(gr, ns)));
   // the grain also shades the scattered light, so it reads even with weak reflections
-  let gshade = clamp(1.0 + mix(2.6, 1.8, u.plate.w) * (dot(n, normalize(u.light.xyz)) - dot(ns, normalize(u.light.xyz))), 0.5, 1.5);
-  let ft = i.j0 - n * dot(i.j0, n);
-  let tt = select(normalize(cross(n, vec3f(0.0, 0.0, 1.0))), normalize(ft), length(ft) > 1e-4);
-  let bt = cross(n, tt);
-  let nv0 = dot(n, V);
+  let gshade: f32 = clamp(1.0 + mix(2.6, 1.8, u.plate.w) * (dot(n, normalize(u.light.xyz)) - dot(ns, normalize(u.light.xyz))), 0.5, 1.5);
+  let ft: vec3f = i.j0 - n * dot(i.j0, n);
+  let tt: vec3f = select(normalize(cross(n, vec3f(0.0, 0.0, 1.0))), normalize(ft), length(ft) > 1e-4);
+  let bt: vec3f = cross(n, tt);
+  let nv0: f32 = dot(n, V);
   if (nv0 < 0.03) { n = normalize(n + V * (0.03 - nv0)); }
-  let rd = refract(-V, n, 1.0 / 1.34);
-  let dm = Ji * rd;
-  let dml = max(length(dm), 1e-4);
-  let dmn = dm / dml;
-  let hi = u.dims.xyz;
-  let safe = select(vec3f(-1e-5), vec3f(1e-5), dmn >= vec3f(0.0)) + dmn;
-  let tb = (select(vec3f(0.0), hi, dmn > vec3f(0.0)) - i.m) / safe;
-  let texit = clamp(min(min(tb.x, tb.y), tb.z), 0.0, 2.4);
-  let ds = texit / f32(STEPS);
-  let lm = normalize(Ji * u.light.xyz);
-  let upm = normalize(Ji * vec3f(0.0, 1.0, 0.0));
-  let fA = u.sigA.xyz * u.misc.z; let fS = u.sigS.xyz * u.misc.y;
-  let sEff = sqrt(3.0 * fA * (fA + fS * 0.35));
-  var T = vec3f(1.0);
-  var acc = vec3f(0.0);
-  let jit = 0.35 + 0.3 * hash12(i.p.xy);
+  let rd: vec3f = refract(-V, n, 1.0 / 1.34);
+  let dm: vec3f = Ji * rd;
+  let dml: f32 = max(length(dm), 1e-4);
+  let dmn: vec3f = dm / dml;
+  let hi: vec3f = u.dims.xyz;
+  let safe: vec3f = select(vec3f(-1e-5), vec3f(1e-5), dmn >= vec3f(0.0)) + dmn;
+  let tb: vec3f = (select(vec3f(0.0), hi, dmn > vec3f(0.0)) - i.m) / safe;
+  let texit: f32 = clamp(min(min(tb.x, tb.y), tb.z), 0.0, 2.4);
+  let ds: f32 = texit / f32(STEPS);
+  let lm: vec3f = normalize(Ji * u.light.xyz);
+  let upm: vec3f = normalize(Ji * vec3f(0.0, 1.0, 0.0));
+  let fA: vec3f = u.sigA.xyz * u.misc.z; let fS: vec3f = u.sigS.xyz * u.misc.y;
+  let sEff: vec3f = sqrt(3.0 * fA * (fA + fS * 0.35));
+  var T: vec3f = vec3f(1.0);
+  var acc: vec3f = vec3f(0.0);
+  let jit: f32 = 0.35 + 0.3 * hash12(i.p.xy);
   // light entering through the face being viewed (keeps side faces orange instead of deep red)
-  let face = KEY * u.light.w * 0.55 * max(0.4 * u.plate.w + (1.0 - 0.4 * u.plate.w) * dot(n, normalize(u.light.xyz)), 0.0) + AMB * 0.6;
-  for (var s = 0; s < STEPS; s++) {
-    let m = i.m + dmn * ((f32(s) + jit) * ds);
-    let md = medium(m);
-    let sT = md.sA + md.sS;
-    let top = exitDist(m, upm);
-    let dl = min(exitDist(m, lm), 2.0);
-    let Li = max(KEY * u.light.w * exp(-sEff * dl) + AMB * 0.75 * exp(-sEff * top * 0.8), face * exp(-sEff * (f32(s) + jit) * ds)) + AMB * 0.12;
-    let st = exp(-sT * ds);
+  let face: vec3f = KEY * u.light.w * 0.55 * max(0.4 * u.plate.w + (1.0 - 0.4 * u.plate.w) * dot(n, normalize(u.light.xyz)), 0.0) + AMB * 0.6;
+  for (var s: i32 = 0; s < STEPS; s++) {
+    let m: vec3f = i.m + dmn * ((f32(s) + jit) * ds);
+    let md: Med = medium(m);
+    let sT: vec3f = md.sA + md.sS;
+    let top: f32 = exitDist(m, upm);
+    let dl: f32 = min(exitDist(m, lm), 2.0);
+    let Li: vec3f = max(KEY * u.light.w * exp(-sEff * dl) + AMB * 0.75 * exp(-sEff * top * 0.8), face * exp(-sEff * (f32(s) + jit) * ds)) + AMB * 0.12;
+    let st: vec3f = exp(-sT * ds);
     acc += T * (md.sS / max(sT, vec3f(1e-3))) * (1.0 - st) * Li;
     T *= st;
   }
-  let ep = i.wp + rd * (texit / dml);
-  let cp = u.vp * vec4f(ep, 1.0);
-  let suv = vec2f(cp.x / cp.w * 0.5 + 0.5, 0.5 - cp.y / cp.w * 0.5);
-  let bg = textureSampleLevel(bgTex, sClamp, suv, 0.0).rgb;
-  var col = acc * gshade + T * bg;
-  let nv = max(dot(n, V), 0.0);
-  let F = 0.022 + 0.978 * pow(1.0 - nv, 5.0);
-  let l = normalize(u.light.xyz);
-  let h = normalize(l + V);
-  let nh = max(dot(n, h), 0.0);
-  let nl = max(dot(n, l), 0.0);
-  let Fh = 0.022 + 0.978 * pow(1.0 - max(dot(h, V), 0.0), 5.0);
-  let an = 1.0 + u.ex2.y;
-  let spec = (ggxA(h, n, tt, bt, u.ex.y, u.ex.y * an) * 0.55 + ggxA(h, n, tt, bt, u.ex.y * 3.7, u.ex.y * 3.7 * an) * 0.45) * Fh * nl * u.light.w * u.ex.x;
-  let luma = dot(col, vec3f(0.2126, 0.7152, 0.0722));
+  let ep: vec3f = i.wp + rd * (texit / dml);
+  let cp: vec4f = u.vp * vec4f(ep, 1.0);
+  let suv: vec2f = vec2f(cp.x / cp.w * 0.5 + 0.5, 0.5 - cp.y / cp.w * 0.5);
+  let bg: vec3f = textureSampleLevel(bgTex, sClamp, suv, 0.0).rgb;
+  var col: vec3f = acc * gshade + T * bg;
+  let nv: f32 = max(dot(n, V), 0.0);
+  let F: f32 = 0.022 + 0.978 * pow(1.0 - nv, 5.0);
+  let l: vec3f = normalize(u.light.xyz);
+  let h: vec3f = normalize(l + V);
+  let nh: f32 = max(dot(n, h), 0.0);
+  let nl: f32 = max(dot(n, l), 0.0);
+  let Fh: f32 = 0.022 + 0.978 * pow(1.0 - max(dot(h, V), 0.0), 5.0);
+  let an: f32 = 1.0 + u.ex2.y;
+  let spec: f32 = (ggxA(h, n, tt, bt, u.ex.y, u.ex.y * an) * 0.55 + ggxA(h, n, tt, bt, u.ex.y * 3.7, u.ex.y * 3.7 * an) * 0.45) * Fh * nl * u.light.w * u.ex.x;
+  let luma: f32 = dot(col, vec3f(0.2126, 0.7152, 0.0722));
   col = max(mix(vec3f(luma), col, 1.18), vec3f(0.0));        // the filmic curve mutes saturated flesh; win it back
-  let Fr = F * u.ex.x;
+  let Fr: f32 = F * u.ex.x;
   col = col * (1.0 - Fr) + envColor(reflect(-V, n)) * Fr + KEY * spec;
   return vec4f(tonemap(col), 1.0);
 }
@@ -1049,21 +1049,21 @@ fn exitDist(m: vec3f, d: vec3f) -> f32 {
 struct WO { @builtin(position) p: vec4f, @location(0) wp: vec3f, @location(1) n: vec3f };
 @vertex fn vsWasabi(@location(0) pos: vec3f, @location(1) nrm: vec3f) -> WO { return WO(u.vp * vec4f(pos, 1.0), pos, nrm); }
 @fragment fn fsWasabi(i: WO) -> @location(0) vec4f {
-  let V = normalize(u.cam.xyz - i.wp);
-  let q = i.wp * vec3f(2.2, 2.6, 2.2) + vec3f(0.3, 0.6, 0.1);
-  let e = 0.01;
-  let h0 = N4(q).x;
-  let g = vec3f(N4(q + vec3f(e, 0.0, 0.0)).x - h0, N4(q + vec3f(0.0, e, 0.0)).x - h0, N4(q + vec3f(0.0, 0.0, e)).x - h0) / e;
-  let n = normalize(i.n - 0.05 * (g - i.n * dot(g, i.n)));
-  let l = normalize(u.light.xyz);
-  let alb = u.wasabi.xyz * (0.84 + 0.32 * N4(q * 1.7).y);
-  let wrap = max((dot(n, l) + 0.35) / 1.35, 0.0);
-  let cav = 0.7 + 0.3 * smoothstep(0.3, 0.7, h0);
-  var col = alb * (KEY * u.light.w * 0.75 * wrap + AMB * 0.6) * cav;
+  let V: vec3f = normalize(u.cam.xyz - i.wp);
+  let q: vec3f = i.wp * vec3f(2.2, 2.6, 2.2) + vec3f(0.3, 0.6, 0.1);
+  let e: f32 = 0.01;
+  let h0: f32 = N4(q).x;
+  let g: vec3f = vec3f(N4(q + vec3f(e, 0.0, 0.0)).x - h0, N4(q + vec3f(0.0, e, 0.0)).x - h0, N4(q + vec3f(0.0, 0.0, e)).x - h0) / e;
+  let n: vec3f = normalize(i.n - 0.05 * (g - i.n * dot(g, i.n)));
+  let l: vec3f = normalize(u.light.xyz);
+  let alb: vec3f = u.wasabi.xyz * (0.84 + 0.32 * N4(q * 1.7).y);
+  let wrap: f32 = max((dot(n, l) + 0.35) / 1.35, 0.0);
+  let cav: f32 = 0.7 + 0.3 * smoothstep(0.3, 0.7, h0);
+  var col: vec3f = alb * (KEY * u.light.w * 0.75 * wrap + AMB * 0.6) * cav;
   col += alb * 0.14 * u.light.w * pow(max(dot(-V, l), 0.0), 2.0);
-  let F = 0.03 + 0.97 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
-  let h = normalize(l + V);
-  let t = normalize(cross(n, vec3f(0.0, 0.0, 1.0)));
+  let F: f32 = 0.03 + 0.97 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
+  let h: vec3f = normalize(l + V);
+  let t: vec3f = normalize(cross(n, vec3f(0.0, 0.0, 1.0)));
   col += KEY * ggxA(h, n, t, cross(n, t), 0.16, 0.16) * F * max(dot(n, l), 0.0) * u.light.w * 0.6 * u.ex.x;
   col = col * (1.0 - F * 0.3) + envColor(reflect(-V, n)) * F * 0.3 * u.ex.x;
   return vec4f(tonemap(col), 1.0);
@@ -1071,7 +1071,7 @@ struct WO { @builtin(position) p: vec4f, @location(0) wp: vec3f, @location(1) n:
 
 // ---- mesh overlay
 @vertex fn vsLine(@location(0) p: vec3f) -> @builtin(position) vec4f {
-  var c = u.vp * vec4f(p, 1.0);
+  var c: vec4f = u.vp * vec4f(p, 1.0);
   c.z -= 0.0006 * c.w;
   return c;
 }
@@ -1146,19 +1146,170 @@ function fleshOptics(hex) {
   return { sA, sS };
 }
 
+// ---------- WebGL2 fallback for browsers without WebGPU: the same WGSL, translated to GLSL, behind the few
+// WebGPU calls main() uses. Every pass renders upside down (clip y negated), so framebuffer and texture
+// coordinates match WebGPU's; the last pass is flipped back when it is copied to the canvas.
+function wgslToGlsl(wgsl, vsName, fsName) {
+  const T = { vec2f: 'vec2', vec3f: 'vec3', vec4f: 'vec4', vec2i: 'ivec2', mat3x3f: 'mat3', mat4x4f: 'mat4', f32: 'float', i32: 'int', u32: 'uint' };
+  let s = wgsl.replace(/\/\/.*$/gm, '').replace(/@builtin\(position\)/g, '@pos').replace(/@builtin\(vertex_index\)/g, '@vid').replace(/@location\((\d)\)/g, '@l$1')
+    .replace(/\b(vec[234]f|vec2i|mat3x3f|mat4x4f|[fiu]32)\b/g, m => T[m]);
+  const field = x => { const m = /^(?:@(\w+) )?(\w+): (\w+)$/.exec(x.trim()); return { at: m[1], name: m[2], type: m[3] }; };
+  const fields = t => t.split(',').filter(x => x.trim()).map(field);
+  let head = '', samplers = '';
+  s = s.replace(/@group\(0\) @binding\(\d\) var(?:<uniform>)? (\w+): (\w+)(?:<float>)?;/g, (_, name, type) => {
+    if (type.startsWith('texture')) samplers += `uniform highp ${type === 'texture_3d' ? 'sampler3D' : 'sampler2D'} ${name};\n`;
+    return '';
+  });
+  const structs = {};
+  s = s.replace(/struct (\w+) \{([^}]*)\};?/g, (_, name, body) => {
+    const f = structs[name] = fields(body), list = f.map(m => `${m.type} ${m.name};`).join(' ');
+    head += name === 'U' ? `layout(std140) uniform UB { ${list} } u;\n` : `struct ${name} { ${list} };\n`;
+    return '';
+  });
+  const fns = [], re = /(?:@(vertex|fragment) )?fn (\w+)\(([^)]*)\)(?: -> ((?:@\w+ )?\w+))? \{/g;
+  let rest = '', last = 0, m;
+  while ((m = re.exec(s))) {
+    let i = re.lastIndex, d = 1; while (d) { const c = s[i++]; if (c === '{') d++; else if (c === '}') d--; }
+    const ret = m[4] ? field('r: ' + m[4].replace(/^(@\w+ )?(\w+)$/, '$2')) : { type: 'void' }; ret.at = m[4] && m[4][0] === '@' ? m[4].split(' ')[0].slice(1) : undefined;
+    fns.push({ stage: m[1], name: m[2], params: fields(m[3]), ret, body: s.slice(re.lastIndex, i - 1) });
+    rest += s.slice(last, m.index); last = re.lastIndex = i;
+  }
+  const code = t => t.replace(/\b(?:let|var|const) (\w+): (\w+)( =|;)/g, '$2 $1$3')
+    .replace(/textureSampleLevel\((\w+), \w+, /g, 'textureLod($1, ').replace(/textureLoad\(/g, 'texelFetch(')
+    .replace(/(\w+) (>=?) (vec3\([^)]*\))/g, (_, a, op, b) => `${op === '>' ? 'greaterThan' : 'greaterThanEqual'}(${a}, ${b})`);
+  const consts = (rest + s.slice(last)).replace(/const (\w+): (\w+) =/g, 'const $2 $1 =');
+  const sig = f => `${f.ret.type} ${f.name}(${f.params.map(p => p.type + ' ' + p.name).join(', ')})`;
+  const pre = '#version 300 es\nprecision highp float; precision highp int;\n' + head + consts;
+  const io = (dir, pfx, list) => list.filter(p => /^l\d/.test(p.at)).map(p => `${dir === 'in' && pfx === 'a' ? `layout(location=${p.at[1]}) ` : ''}${dir} ${p.type} ${pfx}${p.at[1]};\n`).join('');
+  const arg = pfx => p => p.at === 'vid' ? 'uint(gl_VertexID)' : p.at === 'pos' ? 'gl_FragCoord' : p.at ? pfx + p.at[1]
+    : `${p.type}(${structs[p.type].map(q => q.at === 'pos' ? 'gl_FragCoord' : pfx + q.at[1]).join(', ')})`;
+  const flat = list => list.flatMap(p => p.at ? [p] : structs[p.type]);
+  const v = fns.find(f => f.name === vsName), f = fns.find(f => f.name === fsName);
+  const outs = v.ret.at ? [] : structs[v.ret.type];
+  const vs = pre + io('in', 'a', flat(v.params)) + io('out', 'v', outs) + `${sig(v)} {${code(v.body)}}\nvoid main() {\n`
+    + (v.ret.at ? `gl_Position = ${v.name}(${v.params.map(arg('a')).join(', ')});\n`
+      : `${v.ret.type} r = ${v.name}(${v.params.map(arg('a')).join(', ')});\n` + outs.map(q => `${q.at === 'pos' ? 'gl_Position' : 'v' + q.at[1]} = r.${q.name};\n`).join(''))
+    + 'gl_Position.z = 2.0 * gl_Position.z - gl_Position.w; gl_Position.y = -gl_Position.y;\n}\n';
+  const lib = fns.filter(g => !g.stage);
+  const fs = pre + samplers + io('in', 'v', flat(f.params)) + 'out vec4 fragColor;\n'
+    + 'float select(float a, float b, bool c) { return c ? b : a; }\nvec3 select(vec3 a, vec3 b, bool c) { return c ? b : a; }\nvec3 select(vec3 a, vec3 b, bvec3 c) { return mix(a, b, vec3(c)); }\n'
+    + lib.map(g => sig(g) + ';\n').join('') + lib.concat(f).map(g => `${sig(g)} {${code(g.body)}}\n`).join('')
+    + `void main() { fragColor = ${f.name}(${f.params.map(arg('v')).join(', ')}); }\n`;
+  return [vs, fs];
+}
+function glDevice(canvas) {
+  const gl = canvas.getContext('webgl2', { antialias: false, alpha: false });
+  if (!gl || !(gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float'))) return null;
+  globalThis.GPUBufferUsage ??= { COPY_DST: 8, INDEX: 16, VERTEX: 32, UNIFORM: 64 };
+  globalThis.GPUTextureUsage ??= { COPY_DST: 2, TEXTURE_BINDING: 4, RENDER_ATTACHMENT: 16 };
+  const SCREEN = {}, samples = Math.min(4, gl.getParameter(gl.MAX_SAMPLES));
+  const fbo = attach => { const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f); attach(); return f; };
+  const attach = (point, t) => t.rb ? gl.framebufferRenderbuffer(gl.FRAMEBUFFER, point, gl.RENDERBUFFER, t.rb) : gl.framebufferTexture2D(gl.FRAMEBUFFER, point, gl.TEXTURE_2D, t.tex, 0);
+  function texture({ size: [w, h], format, dimension, sampleCount }) {
+    const t = { w, h, createView() { return t; }, destroy() { gl.deleteTexture(t.tex); gl.deleteRenderbuffer(t.rb); gl.deleteFramebuffer(t.fbo); t.resolve && t.resolve.destroy(); } };
+    if (sampleCount > 1) {
+      t.rb = gl.createRenderbuffer(); gl.bindRenderbuffer(gl.RENDERBUFFER, t.rb);
+      gl.renderbufferStorageMultisample(gl.RENDERBUFFER, samples, format === 'depth24plus' ? gl.DEPTH_COMPONENT24 : gl.RGBA8, w, h);
+      return t;
+    }
+    t.target = dimension === '3d' ? gl.TEXTURE_3D : gl.TEXTURE_2D; t.tex = gl.createTexture(); gl.bindTexture(t.target, t.tex);
+    const wrap = dimension === '3d' ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+    for (const k of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T, gl.TEXTURE_WRAP_R]) gl.texParameteri(t.target, k, wrap);
+    gl.texParameteri(t.target, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(t.target, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    if (dimension !== '3d') gl.texStorage2D(t.target, 1, format === 'rgba16float' ? gl.RGBA16F : gl.RGBA8, w, h);
+    return t;
+  }
+  function pipeline(d) {
+    const src = wgslToGlsl(d.vertex.module.code, d.vertex.entryPoint, d.fragment.entryPoint), prog = gl.createProgram();
+    [gl.VERTEX_SHADER, gl.FRAGMENT_SHADER].forEach((type, k) => {
+      const sh = gl.createShader(type); gl.shaderSource(sh, src[k]); gl.compileShader(sh);
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(d.fragment.entryPoint + ': ' + gl.getShaderInfoLog(sh));
+      gl.attachShader(prog, sh);
+    });
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    gl.useProgram(prog); gl.uniformBlockBinding(prog, gl.getUniformBlockIndex(prog, 'UB'), 0);
+    ['', 'shadowTex', 'bgTex', 'noiseTex'].forEach((name, unit) => name && gl.uniform1i(gl.getUniformLocation(prog, name), unit));   // unit = WGSL binding
+    const layout = d.vertex.buffers && d.vertex.buffers[0], blend = d.fragment.targets[0].blend, ds = d.depthStencil, prim = d.primitive || {};
+    return {
+      getBindGroupLayout() {}, layout, lines: prim.topology === 'line-list',
+      use() {
+        gl.useProgram(prog);
+        if (prim.cullMode === 'back') { gl.enable(gl.CULL_FACE); gl.frontFace(gl.CW); } else gl.disable(gl.CULL_FACE);   // CW: the image is upside down
+        if (ds && ds.depthCompare !== 'always') { gl.enable(gl.DEPTH_TEST); gl.depthFunc(ds.depthCompare === 'less' ? gl.LESS : gl.LEQUAL); gl.depthMask(ds.depthWriteEnabled); } else gl.disable(gl.DEPTH_TEST);
+        if (!blend) gl.disable(gl.BLEND);
+        else {
+          gl.enable(gl.BLEND);
+          if (blend.color.operation === 'max') gl.blendEquation(gl.MAX);
+          else { gl.blendEquation(gl.FUNC_ADD); gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA); }
+        }
+      },
+    };
+  }
+  function beginRenderPass({ colorAttachments: [c], depthStencilAttachment: depth }) {
+    const t = c.view;
+    t.fbo ??= fbo(() => { attach(gl.COLOR_ATTACHMENT0, t); depth && attach(gl.DEPTH_ATTACHMENT, depth.view); });
+    gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo); gl.viewport(0, 0, t.w, t.h);
+    gl.depthMask(true); gl.clearColor(...c.clearValue); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    let pipe, vb;
+    const arrays = () => {
+      const at = pipe.layout ? pipe.layout.attributes : [];
+      if (at.length) gl.bindBuffer(gl.ARRAY_BUFFER, vb.buf);
+      for (let k = 0; k < 6; k++) {
+        const a = at.find(a => a.shaderLocation === k);
+        if (a) { gl.enableVertexAttribArray(k); gl.vertexAttribPointer(k, 3, gl.FLOAT, false, pipe.layout.arrayStride, a.offset); } else gl.disableVertexAttribArray(k);
+      }
+    };
+    return {
+      setPipeline(p) { pipe = p; p.use(); },
+      setBindGroup(_, g) { for (const e of g) { if (e.resource.buffer) gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, e.resource.buffer.buf); else if (e.resource.tex) { gl.activeTexture(gl.TEXTURE0 + e.binding); gl.bindTexture(e.resource.target, e.resource.tex); } } },
+      setVertexBuffer(_, b) { vb = b; },
+      setIndexBuffer(b) { gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, b.buf); },
+      draw(n) { arrays(); gl.drawArrays(gl.TRIANGLES, 0, n); },
+      drawIndexed(n) { arrays(); gl.drawElements(pipe.lines ? gl.LINES : gl.TRIANGLES, n, gl.UNSIGNED_INT, 0); },
+      end() {
+        if (c.resolveTarget !== SCREEN) return;
+        const r = t.resolve ??= texture({ size: [t.w, t.h] }); r.fbo ??= fbo(() => attach(gl.COLOR_ATTACHMENT0, r));
+        const blit = (from, to, y0, y1) => { gl.bindFramebuffer(gl.READ_FRAMEBUFFER, from); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, to); gl.blitFramebuffer(0, 0, t.w, t.h, 0, y0, t.w, y1, gl.COLOR_BUFFER_BIT, gl.NEAREST); };
+        blit(t.fbo, r.fbo, 0, t.h); blit(r.fbo, null, t.h, 0);   // resolve the samples, then flip onto the canvas
+      },
+    };
+  }
+  const device = {
+    createBuffer({ size, usage }) {
+      const b = { buf: gl.createBuffer(), target: usage & 16 ? gl.ELEMENT_ARRAY_BUFFER : usage & 64 ? gl.UNIFORM_BUFFER : gl.ARRAY_BUFFER, destroy() { gl.deleteBuffer(b.buf); } };
+      gl.bindBuffer(b.target, b.buf); gl.bufferData(b.target, size, gl.DYNAMIC_DRAW);
+      return b;
+    },
+    queue: {
+      writeBuffer(b, _, data) { gl.bindBuffer(b.target, b.buf); gl.bufferSubData(b.target, 0, data); },
+      writeTexture({ texture: t }, data, _, [w, h, d]) { gl.bindTexture(t.target, t.tex); gl.texImage3D(t.target, 0, gl.RGBA8, w, h, d, 0, gl.RGBA, gl.UNSIGNED_BYTE, data); },
+      submit() {},
+    },
+    createShaderModule: d => d, createSampler: () => ({}), createBindGroup: d => d.entries, createTexture: texture, createRenderPipeline: pipeline,
+    createCommandEncoder: () => ({ beginRenderPass, finish() {} }),
+  };
+  return { device, format: 'rgba8unorm', ctx: { getCurrentTexture: () => ({ createView: () => SCREEN }) } };
+}
+
 async function main() {
   const fail = msg => {
     $('#fallback').hidden = false; for (const s of ['#panel', '#hint']) $(s).hidden = true;
     if (msg) $('#fallback-msg').textContent = msg;
   };
-  if (!navigator.gpu) { fail(); return; }
-  let adapter = null;
+  const canvas = $('#scene');
+  let adapter = null, device, ctx, format;
   try { adapter = await navigator.gpu.requestAdapter(); } catch (_) {}
-  if (!adapter) { fail(); return; }
-  const device = await adapter.requestDevice();
-  device.lost.then(info => { if (info.reason !== 'destroyed') fail('The graphics device was lost (' + (info.message || info.reason) + '). Reload the page to start again.'); });
-  const canvas = $('#scene'), ctx = canvas.getContext('webgpu'), format = navigator.gpu.getPreferredCanvasFormat();
-  ctx.configure({ device, format, alphaMode: 'opaque' });
+  if (adapter) {
+    device = await adapter.requestDevice();
+    device.lost.then(info => { if (info.reason !== 'destroyed') fail('The graphics device was lost (' + (info.message || info.reason) + '). Reload the page to start again.'); });
+    ctx = canvas.getContext('webgpu'); format = navigator.gpu.getPreferredCanvasFormat();
+    ctx.configure({ device, format, alphaMode: 'opaque' });
+  } else {
+    const g = glDevice(canvas);
+    if (!g) { fail(); return; }
+    ({ device, ctx, format } = g);
+  }
 
   let sim, skin, nbuf, ebuf, vbuf, ibuf, res = 'medium';
   let xPrev, xr;   // the previous step and the drawn state, interpolated between steps so motion stays smooth
@@ -1462,7 +1613,7 @@ async function main() {
 main().catch(err => {
   console.error(err);
   $('#fallback').hidden = false; for (const s of ['#panel', '#hint']) $(s).hidden = true;
-  $('#fallback-msg').textContent = 'WebGPU started but the scene could not be built: ' + (err && err.message ? err.message : err);
+  $('#fallback-msg').textContent = 'The scene could not be built: ' + (err && err.message ? err.message : err);
 });
 })();
 </script>
